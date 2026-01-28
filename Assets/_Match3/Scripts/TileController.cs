@@ -1,6 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections;
+using DG.Tweening;
 
 [RequireComponent(typeof(SpriteRenderer))]
 public class TileController : MonoBehaviour
@@ -19,8 +20,9 @@ public class TileController : MonoBehaviour
         _spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
-    public void SetTileColor(Color color)
+    public void SetTileColor(int id)
     {
+        Color color = GetColorForTileId(id);
         _spriteRenderer.color = color;
     }
 
@@ -69,31 +71,31 @@ public class TileController : MonoBehaviour
         if (tile1 == null || tile2 == null)
             return;
 
-        // Start coroutine on tile1 to animate both tiles
-        tile1.StartCoroutine(tile1.AnimateSwipe(tile1, tile2));
+        AnimateSwipe(tile1, tile2);
     }
 
-    private IEnumerator AnimateSwipe(TileController tile1, TileController tile2)
+    private static void AnimateSwipe(TileController tile1, TileController tile2)
     {
         Vector3 tile1StartPos = tile1.transform.position;
         Vector3 tile2StartPos = tile2.transform.position;
-        float elapsedTime = 0f;
         float duration = 0.3f;
 
-        while (elapsedTime < duration)
+        // Animate tile1 to tile2's position
+        tile1.transform.DOMove(tile2StartPos, duration).SetEase(Ease.InOutQuad);
+
+        // Animate tile2 to tile1's position
+        tile2.transform.DOMove(tile1StartPos, duration).SetEase(Ease.InOutQuad);
+    }
+
+    private Color GetColorForTileId(int tileId)
+    {
+        return tileId switch
         {
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-
-            tile1.transform.position = Vector3.Lerp(tile1StartPos, tile2StartPos, t);
-            tile2.transform.position = Vector3.Lerp(tile2StartPos, tile1StartPos, t);
-
-            yield return null;
-        }
-
-        // Ensure final positions are exact
-        tile1.transform.position = tile2StartPos;
-        tile2.transform.position = tile1StartPos;
+            1 => Color.blue,
+            2 => Color.green,
+            3 => Color.yellow,
+            _ => Color.white
+        };
     }
 
 }
