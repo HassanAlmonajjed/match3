@@ -16,7 +16,7 @@ public class BoardController : MonoBehaviour
     [SerializeField] private float collapseStaggerDelay = 0.02f; // Delay between tiles falling
 
     private Board board;
-    private readonly Dictionary<Vector2Int, TileController> tileControllers = new();
+    private readonly Dictionary<Vector2Int, TileController> tiles = new();
 
     private const float gap = 0.1f; 
     private const int maxIterations = 20;
@@ -50,7 +50,7 @@ public class BoardController : MonoBehaviour
                     // Instantiate tile prefab as child of BoardController
                     TileController tileObj = Instantiate(tilePrefab, position, Quaternion.identity, transform);
 
-                    tileControllers[new Vector2Int(x, y)] = tileObj;
+                    tiles[new Vector2Int(x, y)] = tileObj;
 
                     tileObj.SetTileColor(tile.id);
                 }
@@ -60,18 +60,14 @@ public class BoardController : MonoBehaviour
 
     private void OnPlayerSwiped(TileController swipedTile, SwipeDirection direction)
     {
-        // Find the position of the swiped tile
         Vector2Int swipedPos = Vector2Int.zero;
         bool found = false;
 
-        foreach (var kvp in tileControllers)
+        var swipedEntry = tiles.FirstOrDefault(kvp => kvp.Value == swipedTile);
+        if (swipedEntry.Value != null)
         {
-            if (kvp.Value == swipedTile)
-            {
-                swipedPos = kvp.Key;
-                found = true;
-                break;
-            }
+            swipedPos = swipedEntry.Key;
+            found = true;
         }
 
         if (!found)
@@ -85,10 +81,10 @@ public class BoardController : MonoBehaviour
             return;
 
         // Check if both tiles exist
-        if (!tileControllers.ContainsKey(neighborPos))
+        if (!tiles.ContainsKey(neighborPos))
             return;
 
-        TileController neighborTile = tileControllers[neighborPos];
+        TileController neighborTile = tiles[neighborPos];
 
         // Swap in the board logic
         board.Swipe(swipedPos, neighborPos);
@@ -97,8 +93,8 @@ public class BoardController : MonoBehaviour
         TileController.SwipeTiles(swipedTile, neighborTile);
 
         // Swap tile controller references in dictionary
-        tileControllers[swipedPos] = neighborTile;
-        tileControllers[neighborPos] = swipedTile;
+        tiles[swipedPos] = neighborTile;
+        tiles[neighborPos] = swipedTile;
 
         // Check for matches after a brief delay to let animation finish
         StartCoroutine(CheckAndClearMatches());
@@ -106,48 +102,66 @@ public class BoardController : MonoBehaviour
 
     private IEnumerator CheckAndClearMatches()
     {
+        // Wait for swipe animation to finish before checking for matches
         yield return new WaitForSeconds(swipeDuration);
 
-        // Detect matches
-        var matches = board.DetectMatch();
+        int iterations = 0;
 
-        if (matches.Count > 0)
+        while (true)
         {
-            Debug.Log($"Matches detected at {matches.Count} positions");
+            var matches = board.DetectMatch();
 
-            // Clear matches in board and destroy tile objects
+            if (matches == null || matches.Count <= 0)
+                break;
+
             ClearMatches(matches);
-            board.Print();
 
-            // Collapse existing tiles and animate to their new positions
             yield return StartCoroutine(CollapseAndAnimate());
 
-            // Refill model and animate new tiles falling in
             yield return StartCoroutine(RefillAndAnimate());
+
+            iterations++;
+            if (iterations >= maxIterations)
+            {
+                Debug.LogWarning($"Reached max iterations ({maxIterations}) while resolving matches.");
+                break;
+            }
         }
+
+        board.Print();
     }
 
     private IEnumerator CollapseAndAnimate()
     {
-        // Update model
         board.CollapseColumns();
 
-        var newTileControllers = new Dictionary<Vector2Int, TileController>();
+        var newTiles = new Dictionary<Vector2Int, TileController>();
         Sequence seq = DOTween.Sequence();
+        Collapse(newTiles, seq);
 
+        if (seq.Duration(false) > 0)
+            yield return seq.WaitForCompletion();
+
+        tiles.Clear();
+        foreach (var tile in newTiles)
+            tiles[tile.Key] = tile.Value;
+    }
+
+    private void Collapse(Dictionary<Vector2Int, TileController> newTileControllers, Sequence seq)
+    {
         for (int x = 0; x < board.Width; x++)
         {
-            var controllersInColumn = tileControllers
+            var tilesInColumn = tiles
                 .Where(kvp => kvp.Key.x == x)
                 .OrderBy(kvp => kvp.Key.y)
                 .Select(kvp => kvp.Value)
                 .ToList();
 
-            int count = controllersInColumn.Count;
+            int count = tilesInColumn.Count;
             for (int i = 0; i < count; i++)
             {
                 int newY = board.Height - count + i;
-                var controller = controllersInColumn[i];
+                var controller = tilesInColumn[i];
                 Vector3 newPos = transform.position + new Vector3(x * (1f + gap), -newY * (1f + gap), 0);
 
                 float delay = i * collapseStaggerDelay;
@@ -156,14 +170,6 @@ public class BoardController : MonoBehaviour
                 newTileControllers[new Vector2Int(x, newY)] = controller;
             }
         }
-
-        if (seq.Duration(false) > 0)
-            yield return seq.WaitForCompletion();
-
-        // Update mapping
-        tileControllers.Clear();
-        foreach (var kvp in newTileControllers)
-            tileControllers[kvp.Key] = kvp.Value;
     }
 
     private IEnumerator RefillAndAnimate()
@@ -179,7 +185,7 @@ public class BoardController : MonoBehaviour
             for (int y = 0; y < board.Height; y++)
             {
                 var pos = new Vector2Int(x, y);
-                if (tileControllers.ContainsKey(pos))
+                if (tiles.ContainsKey(pos))
                     continue;
 
                 Tile tile = board.GetTileAtPosition(pos);
@@ -193,7 +199,7 @@ public class BoardController : MonoBehaviour
                 tileObj.SetTileColor(tile.id);
 
                 // Register immediately so lookups work
-                tileControllers[pos] = tileObj;
+                tiles[pos] = tileObj;
 
                 // Animate into place with staggered delay
                 fillSeq.Insert(fillDelayCounter, tileObj.transform.DOMove(finalPos, collapseDuration).SetEase(Ease.OutBounce));
@@ -213,10 +219,10 @@ public class BoardController : MonoBehaviour
         // Destroy tile GameObjects for cleared positions
         foreach (var pos in matches)
         {
-            if (tileControllers.ContainsKey(pos))
+            if (tiles.ContainsKey(pos))
             {
-                Destroy(tileControllers[pos].gameObject);
-                tileControllers.Remove(pos);
+                Destroy(tiles[pos].gameObject);
+                tiles.Remove(pos);
             }
         }
     }
