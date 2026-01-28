@@ -48,21 +48,49 @@ public class Board
 
     public void Populate()
     {
-        _grid = new Tile[,]
+        _grid = new Tile[Width, Height];
+        
+        for (int x = 0; x < Width; x++)
         {
-            { new Tile { id = 1 }, new Tile { id = 2 }, new Tile { id = 2 }, new Tile { id = 3 }, new Tile { id = 1 } },
-            { new Tile { id = 1 }, new Tile { id = 2 }, new Tile { id = 1 }, new Tile { id = 1 }, new Tile { id = 2 } },
-            { new Tile { id = 2 }, new Tile { id = 1 }, new Tile { id = 2 }, new Tile { id = 2 }, new Tile { id = 3 } },
-            { new Tile { id = 3 }, new Tile { id = 2 }, new Tile { id = 3 }, new Tile { id = 2 }, new Tile { id = 1 } },
-            { new Tile { id = 1 }, new Tile { id = 3 }, new Tile { id = 3 }, new Tile { id = 1 }, new Tile { id = 2 } }
-        };
-        /*for (int x = 0; x < _grid.GetLength(0); x++)
-        {
-            for (int y = 0; y < _grid.GetLength(1); y++)
+            for (int y = 0; y < Height; y++)
             {
-                _grid[x, y] = new Tile { id = Random.Range(1, 4) };
+                int tileId = GetValidTileId(x, y);
+                _grid[x, y] = new Tile { id = tileId };
             }
-        }*/
+        }
+    }
+
+    private int GetValidTileId(int x, int y)
+    {
+        int tileId;
+        bool isValid;
+        
+        do
+        {
+            tileId = Random.Range(1, 4);
+            isValid = true;
+            
+            // Check horizontal left matches (need at least 2 tiles to the left)
+            if (x >= 2 && _grid[x - 1, y] != null && _grid[x - 2, y] != null)
+            {
+                if (_grid[x - 1, y].id == _grid[x - 2, y].id && _grid[x - 1, y].id == tileId)
+                {
+                    isValid = false;
+                }
+            }
+            
+            // Check vertical up matches (need at least 2 tiles above)
+            if (isValid && y >= 2 && _grid[x, y - 1] != null && _grid[x, y - 2] != null)
+            {
+                if (_grid[x, y - 1].id == _grid[x, y - 2].id && _grid[x, y - 1].id == tileId)
+                {
+                    isValid = false;
+                }
+            }
+            
+        } while (!isValid);
+        
+        return tileId;
     }
 
     public void Swipe(Vector2Int swipeStart, Vector2Int swipeEnd)
@@ -174,9 +202,9 @@ public class Board
 
     public void ClearMatches(HashSet<Vector2Int> matches)
     {
-        foreach (var pos in matches)
+        foreach (var match in matches)
         {
-            _grid[pos.x, pos.y] = null;
+            _grid[match.x, match.y] = null;
         }
     }
 
