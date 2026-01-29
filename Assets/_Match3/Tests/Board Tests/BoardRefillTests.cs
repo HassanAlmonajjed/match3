@@ -13,7 +13,7 @@ namespace BoardTests
         [SetUp]
         public void SetUp()
         {
-            _board = new Board(Width, Height);
+            _board = new Board(Width, Height, 4);
         }
 
         private void ProcessMatchCollapseAndRefill()
@@ -173,6 +173,22 @@ namespace BoardTests
 
             // Assert
             AssertBoardIsFull();
+        }
+
+        [Test]
+        public void Refill_DoesNotFillExcludedTiles()
+        {
+            int width = 3;
+            int height = 3;
+            var excluded = new System.Collections.Generic.List<Vector2Int> { new Vector2Int(1, 1) };
+
+            var board = new Board(width, height, 4, excluded);
+            // Don't call populate, so all tiles are null
+            
+            board.Refill();
+
+            Assert.IsNull(board.GetTileAtPosition(new Vector2Int(1, 1)), "Excluded tile should not be refilled");
+            Assert.IsNotNull(board.GetTileAtPosition(new Vector2Int(0, 0)), "Normal tile should be refilled");
         }
 
         /*[Test]

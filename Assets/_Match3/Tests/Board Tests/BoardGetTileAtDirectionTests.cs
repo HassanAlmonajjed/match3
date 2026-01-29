@@ -12,7 +12,7 @@ namespace BoardTests
         [SetUp]
         public void Setup()
         {
-            _board = new Board(Width, Height);
+            _board = new Board(Width, Height, 4);
             // Setup a 3x3 board
             // (0,0) (1,0) (2,0)
             // (0,1) (1,1) (2,1)

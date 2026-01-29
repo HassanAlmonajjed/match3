@@ -12,7 +12,7 @@ namespace BoardTests
         [SetUp]
         public void SetUp()
         {
-            _board = new Board(5, 5);
+            _board = new Board(5, 5, 4);
         }
 
         [Test]
@@ -301,6 +301,39 @@ namespace BoardTests
             Assert.IsNull(_board.GetTileAtPosition(new Vector2Int(0, 2)));
             Assert.AreEqual(1, _board.GetTileAtPosition(new Vector2Int(0, 3)).id);
             Assert.AreEqual(2, _board.GetTileAtPosition(new Vector2Int(0, 4)).id);
+        }
+
+        [Test]
+        public void CollapseColumns_WithExcludedTiles_TilesSkipHoles()
+        {
+            // Range (0, 0) to (0, 4)
+            // (0, 0) - Tile 1
+            // (0, 1) - Excluded
+            // (0, 2) - Empty
+            // (0, 3) - Empty
+            // (0, 4) - Empty
+            
+            var exclude = new System.Collections.Generic.List<Vector2Int> { new Vector2Int(0, 1) };
+            _board = new Board(5, 5, 4, exclude);
+            
+            int[,] gridIds = new int[,]
+            {
+                {1, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0}
+            };
+            _board.Populate(gridIds);
+
+            _board.CollapseColumns();
+
+            // Tile 1 should fall to (0, 4) skipping the hole at (0, 1)
+            Assert.IsNull(_board.GetTileAtPosition(new Vector2Int(0, 0)));
+            Assert.IsNull(_board.GetTileAtPosition(new Vector2Int(0, 1)), "Hole should remain empty");
+            Assert.IsNull(_board.GetTileAtPosition(new Vector2Int(0, 2)));
+            Assert.IsNull(_board.GetTileAtPosition(new Vector2Int(0, 3)));
+            Assert.AreEqual(1, _board.GetTileAtPosition(new Vector2Int(0, 4)).id, "Tile should fall to bottom");
         }
     }
 }

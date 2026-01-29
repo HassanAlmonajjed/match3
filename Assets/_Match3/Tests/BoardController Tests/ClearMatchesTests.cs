@@ -19,7 +19,7 @@ namespace BoardControllerTests
             _boardController = go.AddComponent<BoardController>();
             
             // Initialize board
-            _board = new Board(5, 5);
+            _board = new Board(5, 5, 4);
             _boardController.board = _board;
         }
 

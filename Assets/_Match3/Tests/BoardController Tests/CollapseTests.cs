@@ -15,11 +15,11 @@ namespace BoardControllerTests
         [SetUp]
         public void SetUp()
         {
-            GameObject go = new GameObject("BoardController");
+            GameObject go = new("BoardController");
             _boardController = go.AddComponent<BoardController>();
             
             // Initialize board
-            _board = new Board(5, 5);
+            _board = new Board(5, 5, 4);
             _boardController.board = _board;
         }
 

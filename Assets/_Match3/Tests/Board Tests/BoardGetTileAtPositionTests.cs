@@ -8,7 +8,7 @@ namespace BoardTests
         [Test]
         public void GetTileAtPosition_WithinBounds_ReturnsTile()
         {
-            var board = new Board(5, 5);
+            var board = new Board(5, 5, 4);
             board.Populate();
 
             Vector2Int pos = new Vector2Int(2, 2);
@@ -20,10 +20,10 @@ namespace BoardTests
         [Test]
         public void GetTileAtPosition_NegativeCoordinates_ReturnsNull()
         {
-            var board = new Board(5, 5);
+            var board = new Board(5, 5, 4);
             board.Populate();
 
-            Vector2Int pos = new Vector2Int(-1, 0);
+            Vector2Int pos = new(-1, 0);
             Tile tile = board.GetTileAtPosition(pos);
 
             Assert.IsNull(tile, "Expected null for negative coordinates");
@@ -32,7 +32,7 @@ namespace BoardTests
         [Test]
         public void GetTileAtPosition_TooLargeCoordinates_ReturnsNull()
         {
-            var board = new Board(3, 3);
+            var board = new Board(3, 3, 4);
             board.Populate();
 
             Vector2Int pos = new Vector2Int(3, 3);

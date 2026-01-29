@@ -4,7 +4,7 @@ public class CameraController : MonoBehaviour
 {
     public float unitsToShowHorizontally = 12;
 
-    void Update()
+    void Start()
     {
         float screenWidth = unitsToShowHorizontally;
 

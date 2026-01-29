@@ -7,12 +7,17 @@ public class Board
     public int Width { get; private set; }
     public int Height { get; private set; }
     public int UniqueTiles { get; private set; }
-    public Board(int width, int height, int uniqueTiles = 4)
+    private HashSet<Vector2Int> _excludedTiles = new();
+    public Board(int width, int height, int uniqueTiles, List<Vector2Int> exclude = null)
     {
         _grid = new Tile[width, height];
         Width = width;
         Height = height;
         UniqueTiles = uniqueTiles;
+        if (exclude != null)
+        {
+            _excludedTiles = new HashSet<Vector2Int>(exclude);
+        }
     }
 
     public Tile GetTileAtPosition(Vector2Int position)
@@ -50,14 +55,21 @@ public class Board
         return neighborPos;
     }
 
-    public void Populate()
+    public void Populate(List<Vector2Int> exclude = null)
     {
         _grid = new Tile[Width, Height];
+        if (exclude != null)
+        {
+            _excludedTiles = new HashSet<Vector2Int>(exclude);
+        }
 
         for (int x = 0; x < Width; x++)
         {
             for (int y = 0; y < Height; y++)
             {
+                if (_excludedTiles.Contains(new Vector2Int(x, y)))
+                    continue;
+
                 int tileId = GetValidTileId(x, y);
                 _grid[x, y] = new Tile { id = tileId };
             }
@@ -126,7 +138,7 @@ public class Board
         return position.x >= 0 && position.x < Width && position.y >= 0 && position.y < Height;
     }
 
-    public void Print()
+    public override string ToString()
     {
         string grid = "";
         for (int y = 0; y < Height; y++)
@@ -137,6 +149,8 @@ public class Board
             }
             grid += "\n";
         }
+
+        return grid;
     }
 
     public HashSet<Vector2Int> DetectMatch()
@@ -244,19 +258,30 @@ public class Board
         for (int x = 0; x < Width; x++)
         {
             int writeIndex = Height - 1;
-            
+
             for (int y = Height - 1; y >= 0; y--)
             {
-                if (_grid[x, y] == null)
+                // If the writeIndex is an excluded tile, we cannot write to it
+                while (writeIndex >= 0 && _excludedTiles.Contains(new Vector2Int(x, writeIndex)))
+                {
+                    writeIndex--;
+                }
+
+                if (y > writeIndex) continue;
+
+                // Excluded tiles don't move and can't be source for collapse
+                if (_excludedTiles.Contains(new Vector2Int(x, y)))
                     continue;
 
-                // If we're not at the write position, move the tile down
-                if (y != writeIndex)
+                if (_grid[x, y] != null)
                 {
-                    _grid[x, writeIndex] = _grid[x, y];
-                    _grid[x, y] = null;
+                    if (y != writeIndex)
+                    {
+                        _grid[x, writeIndex] = _grid[x, y];
+                        _grid[x, y] = null;
+                    }
+                    writeIndex--;
                 }
-                writeIndex--;
             }
         }
     }
@@ -267,9 +292,9 @@ public class Board
         {
             for (int y = 0; y < Height; y++)
             {
-                if (_grid[x, y] == null)
+                if (_grid[x, y] == null && !_excludedTiles.Contains(new Vector2Int(x, y)))
                 {
-                    _grid[x, y] = new Tile { id = Random.Range(1, 4) };
+                    _grid[x, y] = new Tile { id = Random.Range(1, UniqueTiles) };
                 }
             }
         }

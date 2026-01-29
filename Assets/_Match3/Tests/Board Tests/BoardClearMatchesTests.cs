@@ -11,7 +11,7 @@ namespace BoardTests
         [SetUp]
         public void SetUp()
         {
-            _board = new Board(5, 5);
+            _board = new Board(5, 5,4);
         }
 
         [Test]

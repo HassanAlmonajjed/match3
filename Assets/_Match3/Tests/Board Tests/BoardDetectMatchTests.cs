@@ -11,7 +11,7 @@ namespace BoardTests
         [SetUp]
         public void SetUp()
         {
-            _board = new Board(5, 5);
+            _board = new Board(5, 5, 4);
         }
 
         [Test]
@@ -285,7 +285,7 @@ namespace BoardTests
         public void DetectMatch_LShapeMatch_ReturnsOnlyStraightLines()
         {
             // Arrange
-            var board = new Board(3, 3);
+            var board = new Board(3, 3, 4);
             var gridIds = new int[,]
             {
             {1, 1, 1},

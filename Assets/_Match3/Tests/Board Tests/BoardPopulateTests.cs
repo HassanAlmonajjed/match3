@@ -14,7 +14,7 @@ namespace BoardTests
 
             for (int i = 0; i < runs; i++)
             {
-                var board = new Board(width, height);
+                var board = new Board(width, height, 4);
                 board.Populate();
 
                 // Verify grid is populated
@@ -46,7 +46,7 @@ namespace BoardTests
             { 2, 1, 3 }
             };
 
-            var board = new Board(width, height);
+            var board = new Board(width, height, 4);
             board.Populate(gridIds);
 
             for (int y = 0; y < height; y++)
@@ -72,7 +72,7 @@ namespace BoardTests
             { 3, 0 } // 0 should be treated as empty/null based on gridIds[y, x] > 0 check
             };
 
-            var board = new Board(width, height);
+            var board = new Board(width, height, 4);
             board.Populate(gridIds);
 
             // Check (0,0) -> 1
@@ -90,6 +90,31 @@ namespace BoardTests
 
             // Check (0,2) -> out of bounds of gridIds height -> should be null
             Assert.IsNull(board.GetTileAtPosition(new Vector2Int(0, 2)), "Expected null at (0,2)");
+        }
+
+        [Test]
+        public void Populate_WithExcludedTiles_StaysEmpty()
+        {
+            int width = 5;
+            int height = 5;
+            var excluded = new System.Collections.Generic.List<Vector2Int>
+            {
+                new Vector2Int(1, 1),
+                new Vector2Int(2, 2),
+                new Vector2Int(3, 3)
+            };
+
+            var board = new Board(width, height, 4, excluded);
+            board.Populate();
+
+            foreach (var pos in excluded)
+            {
+                Assert.IsNull(board.GetTileAtPosition(pos), $"Expected tile at {pos} to be null (excluded)");
+            }
+
+            // Verify other tiles are NOT null
+            Assert.IsNotNull(board.GetTileAtPosition(new Vector2Int(0, 0)));
+            Assert.IsNotNull(board.GetTileAtPosition(new Vector2Int(1, 0)));
         }
     }
 }

@@ -15,6 +15,7 @@ public class BoardController : MonoBehaviour
     [SerializeField] private float _gap = 0.1f;
     [SerializeField] private int maxIterations = 20;
     [SerializeField] private Vector3 _offset;
+    [SerializeField] private List<Vector2Int> excludedTiles = new();
 
     [Header("Sprites")]
     [SerializeField] private Sprite[] tileSprites;
@@ -44,7 +45,7 @@ public class BoardController : MonoBehaviour
 
     void Start()
     {
-        board = new Board(width, height, uniqueTiles);
+        board = new Board(width, height, uniqueTiles, excludedTiles);
         board.Populate();
         GenerateBoard();
 
@@ -155,8 +156,6 @@ public class BoardController : MonoBehaviour
                 break;
             }
         }
-
-        board.Print();
     }
 
     private IEnumerator CollapseAndAnimate()
