@@ -11,6 +11,7 @@ public class BoardController : MonoBehaviour
     [SerializeField] private TileController tilePrefab;
     [SerializeField] private int width = 5;
     [SerializeField] private int height = 5;
+    [SerializeField, Range(1, 7)] private int uniqueTiles = 5;
     [SerializeField] private float _gap = 0.1f;
     [SerializeField] private int maxIterations = 20;
     [SerializeField] private Vector3 _offset;
@@ -29,7 +30,6 @@ public class BoardController : MonoBehaviour
 
     public Dictionary<Vector2Int, TileController> Tiles { get; private set; } = new();
 
-
     private void Awake()
     {
         if (Instance == null)
@@ -44,7 +44,7 @@ public class BoardController : MonoBehaviour
 
     void Start()
     {
-        board = new Board(width, height);
+        board = new Board(width, height, uniqueTiles);
         board.Populate();
         GenerateBoard();
 
@@ -329,7 +329,7 @@ public class BoardController : MonoBehaviour
                 if (controller != null)
                 {
                     var tileObj = controller.gameObject;
-                    
+
                     // Kill any active tweens on the object before destroying it
                     tileObj.transform.DOKill();
 

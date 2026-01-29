@@ -6,11 +6,13 @@ public class Board
     private Tile[,] _grid;
     public int Width { get; private set; }
     public int Height { get; private set; }
-    public Board(int width, int height)
+    public int UniqueTiles { get; private set; }
+    public Board(int width, int height, int uniqueTiles = 4)
     {
         _grid = new Tile[width, height];
         Width = width;
         Height = height;
+        UniqueTiles = uniqueTiles;
     }
 
     public Tile GetTileAtPosition(Vector2Int position)
@@ -85,7 +87,7 @@ public class Board
 
         do
         {
-            tileId = Random.Range(1, 4);
+            tileId = Random.Range(1, UniqueTiles);
             isValid = true;
 
             // Check horizontal left matches (need at least 2 tiles to the left)
