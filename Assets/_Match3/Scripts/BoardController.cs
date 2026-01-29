@@ -45,6 +45,7 @@ public class BoardController : MonoBehaviour
                 if (tile != null)       
                 {
                     // Calculate position with gaps relative to board starting point
+                    // y=0 is at top, y increases downward
                     Vector3 position = transform.position + new Vector3(x * (1f + gap), -y * (1f + gap), 0);
 
                     // Instantiate tile prefab as child of BoardController
@@ -147,27 +148,51 @@ public class BoardController : MonoBehaviour
             tiles[tile.Key] = tile.Value;
     }
 
+
+
     private void Collapse(Dictionary<Vector2Int, TileController> newTileControllers, Sequence seq)
     {
         for (int x = 0; x < board.Width; x++)
         {
-            var tilesInColumn = tiles
+            // Collect all existing tile controllers in this column, sorted by their CURRENT Y position (top to bottom)
+            var existingControllers = tiles
                 .Where(kvp => kvp.Key.x == x)
                 .OrderBy(kvp => kvp.Key.y)
                 .Select(kvp => kvp.Value)
                 .ToList();
-
-            int count = tilesInColumn.Count;
-            for (int i = 0; i < count; i++)
+            
+            // Now find where the board model says tiles should be in this column (also top to bottom)
+            int controllerIndex = 0;
+            for (int y = 0; y < board.Height; y++)
             {
-                int newY = board.Height - count + i;
-                var controller = tilesInColumn[i];
-                Vector3 newPos = transform.position + new Vector3(x * (1f + gap), -newY * (1f + gap), 0);
+                var pos = new Vector2Int(x, y);
+                var tile = board.GetTileAtPosition(pos);
+                
+                if (tile != null)
+                {
+                    if (controllerIndex < existingControllers.Count)
+                    {
+                        var controller = existingControllers[controllerIndex];
+                        // Visual position: y=0 is at top, so use -y
+                        Vector3 newPos = transform.position + new Vector3(x * (1f + gap), -y * (1f + gap), 0);
 
-                float delay = i * collapseStaggerDelay;
-                seq.Insert(delay, controller.transform.DOMove(newPos, collapseDuration).SetEase(Ease.InOutQuad));
+                        float delay = controllerIndex * collapseStaggerDelay;
+                        seq.Insert(delay, controller.transform.DOMove(newPos, collapseDuration).SetEase(Ease.InOutQuad));
 
-                newTileControllers[new Vector2Int(x, newY)] = controller;
+                        newTileControllers[pos] = controller;
+                        controllerIndex++;
+                    }
+                    else
+                    {
+                        Debug.LogError($"Collapse Mismatch: Board has more tiles than Controller at Column {x}. Board needs tile at {y}, but we only had {existingControllers.Count} controllers.");
+                    }
+                }
+            }
+
+            // Safety check: Did we use all controllers?
+            if (controllerIndex < existingControllers.Count)
+            {
+                Debug.LogWarning($"Collapse Mismatch: Controller has MORE tiles than Board at Column {x}. Used {controllerIndex} of {existingControllers.Count} controllers.");
             }
         }
     }
@@ -192,7 +217,9 @@ public class BoardController : MonoBehaviour
                 if (tile == null)
                     continue;
 
-                Vector3 spawnPos = transform.position + new Vector3(x * (1f + gap), 1f * (1f + gap), 0);
+                // Spawn above the board (negative y value, above y=0)
+                Vector3 spawnPos = transform.position + new Vector3(x * (1f + gap), (1f + gap), 0);
+                // y=0 is at top, so use -y for visual position
                 Vector3 finalPos = transform.position + new Vector3(x * (1f + gap), -y * (1f + gap), 0);
 
                 TileController tileObj = Instantiate(tilePrefab, spawnPos, Quaternion.identity, transform);

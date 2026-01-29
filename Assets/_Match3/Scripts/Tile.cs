@@ -12,7 +12,7 @@ public class Tile : System.IEquatable<Tile>
         if (other == null)
             return false;
 
-        if (id < 0 || other.id < 0)
+        if (id <= 0 || other.id <= 0)
             return false;
 
         return id == other.id;
@@ -30,7 +30,7 @@ public class Tile : System.IEquatable<Tile>
 
     public static bool operator ==(Tile left, Tile right)
     {
-        if (left is null && right is null)
+        if (ReferenceEquals(left, right))
             return true;
         if (left is null || right is null)
             return false;

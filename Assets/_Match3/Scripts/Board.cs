@@ -15,7 +15,9 @@ public class Board
 
     public Tile GetTileAtPosition(Vector2Int position)
     {
-        // implement it
+        if (!IsInsideGrid(position))
+            return null;
+
         return _grid[position.x, position.y];
     }
 
@@ -40,7 +42,7 @@ public class Board
         }
 
         // Check if the neighbor position is within bounds
-        if (neighborPos.x < 0 || neighborPos.x >= Width || neighborPos.y < 0 || neighborPos.y >= Height)
+        if (!IsInsideGrid(neighborPos))
             return new Vector2Int(-1, -1);
 
         return neighborPos;
@@ -49,7 +51,7 @@ public class Board
     public void Populate()
     {
         _grid = new Tile[Width, Height];
-        
+
         for (int x = 0; x < Width; x++)
         {
             for (int y = 0; y < Height; y++)
@@ -60,16 +62,32 @@ public class Board
         }
     }
 
+    public void Populate(int[,] gridIds)
+    {
+        _grid = new Tile[Width, Height];
+
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                if (y < gridIds.GetLength(0) && x < gridIds.GetLength(1) && gridIds[y, x] > 0)
+                {
+                    _grid[x, y] = new Tile { id = gridIds[y, x] };
+                }
+            }
+        }
+    }
+
     private int GetValidTileId(int x, int y)
     {
         int tileId;
         bool isValid;
-        
+
         do
         {
             tileId = Random.Range(1, 4);
             isValid = true;
-            
+
             // Check horizontal left matches (need at least 2 tiles to the left)
             if (x >= 2 && _grid[x - 1, y] != null && _grid[x - 2, y] != null)
             {
@@ -78,7 +96,7 @@ public class Board
                     isValid = false;
                 }
             }
-            
+
             // Check vertical up matches (need at least 2 tiles above)
             if (isValid && y >= 2 && _grid[x, y - 1] != null && _grid[x, y - 2] != null)
             {
@@ -87,25 +105,33 @@ public class Board
                     isValid = false;
                 }
             }
-            
+
         } while (!isValid);
-        
+
         return tileId;
     }
 
     public void Swipe(Vector2Int swipeStart, Vector2Int swipeEnd)
     {
-        (_grid[swipeEnd.x, swipeEnd.y], _grid[swipeStart.x, swipeStart.y]) = (_grid[swipeStart.x, swipeStart.y], _grid[swipeEnd.x, swipeEnd.y]);
+        if (IsInsideGrid(swipeStart) && IsInsideGrid(swipeEnd))
+        {
+            (_grid[swipeEnd.x, swipeEnd.y], _grid[swipeStart.x, swipeStart.y]) = (_grid[swipeStart.x, swipeStart.y], _grid[swipeEnd.x, swipeEnd.y]);
+        }
+    }
+
+    public bool IsInsideGrid(Vector2Int position)
+    {
+        return position.x >= 0 && position.x < Width && position.y >= 0 && position.y < Height;
     }
 
     public void Print()
     {
         string grid = "";
-        for (int y = 0; y < _grid.GetLength(1); y++)
+        for (int y = 0; y < Height; y++)
         {
-            for (int x = 0; x < _grid.GetLength(0); x++)
+            for (int x = 0; x < Width; x++)
             {
-                grid += _grid[x, y] == null ? "X" : _grid[x, y].ToString() + " ";
+                grid += _grid[x, y] == null ? "X " : _grid[x, y].ToString() + " ";
             }
             grid += "\n";
         }
@@ -130,7 +156,9 @@ public class Board
             {
                 Tile current = _grid[x, y];
                 Tile previous = _grid[x - 1, y];
-                if (current == previous)
+
+                // Only count a match if both tiles are not null and they have the same ID
+                if (current != null && previous != null && current == previous)
                 {
                     matchLength++;
                 }
@@ -162,7 +190,9 @@ public class Board
             {
                 Tile current = _grid[x, y];
                 Tile previous = _grid[x, y - 1];
-                if (current == previous)
+
+                // Only count a match if both tiles are not null and they have the same ID
+                if (current != null && previous != null && current == previous)
                 {
                     matchLength++;
                 }
@@ -212,19 +242,20 @@ public class Board
     {
         for (int x = 0; x < Width; x++)
         {
-            int emptySpot = -1;
+            int writeIndex = Height - 1;
+            
             for (int y = Height - 1; y >= 0; y--)
             {
-                if (_grid[x, y] == null && emptySpot == -1)
+                if (_grid[x, y] == null)
+                    continue;
+
+                // If we're not at the write position, move the tile down
+                if (y != writeIndex)
                 {
-                    emptySpot = y;
-                }
-                else if (_grid[x, y] != null && emptySpot != -1)
-                {
-                    _grid[x, emptySpot] = _grid[x, y];
+                    _grid[x, writeIndex] = _grid[x, y];
                     _grid[x, y] = null;
-                    emptySpot--;
                 }
+                writeIndex--;
             }
         }
     }
