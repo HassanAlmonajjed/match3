@@ -30,6 +30,7 @@ public class BoardController : MonoBehaviour
     public Board board;
 
     public Dictionary<Vector2Int, TileController> Tiles { get; private set; } = new();
+    public bool IsBusy { get; private set; } = false;
 
     private void Awake()
     {
@@ -90,63 +91,92 @@ public class BoardController : MonoBehaviour
 
     private void OnPlayerSwiped(TileController swipedTile, SwipeDirection direction)
     {
-        Vector2Int swipedPos = Vector2Int.zero;
-        bool found = false;
-
-        var swipedEntry = Tiles.FirstOrDefault(kvp => kvp.Value == swipedTile);
-        if (swipedEntry.Value != null)
-        {
-            swipedPos = swipedEntry.Key;
-            found = true;
-        }
-
-        if (!found)
+        if (IsBusy)
             return;
+
+        StartCoroutine(SwipeCoroutine(swipedTile, direction));
+    }
+
+    private IEnumerator SwipeCoroutine(TileController swipedTile, SwipeDirection direction)
+    {
+        IsBusy = true;
+
+        Vector2Int swipedPos = GetTilePosition(swipedTile);
+
+        if (swipedPos == new Vector2Int(-1, -1))
+        {
+            IsBusy = false;
+            yield break;
+        }
 
         // Get the neighbor position
         Vector2Int neighborPos = board.GetTileAtDirection(swipedPos, direction);
 
         // Check if neighbor position is valid
-        if (neighborPos.x == -1 || neighborPos.y == -1)
-            return;
+        if (neighborPos.x == -1 || neighborPos.y == -1 || !Tiles.ContainsKey(neighborPos))
+        {
+            IsBusy = false;
+            yield break;
+        }
 
-        // Check if both tiles exist
-        if (!Tiles.ContainsKey(neighborPos))
-            return;
+        // Perform initial swap
+        SwapTiles(swipedPos, neighborPos);
 
-        TileController neighborTile = Tiles[neighborPos];
-
-        // Swap in the board logic
-        board.Swipe(swipedPos, neighborPos);
-
-        // Animate the tiles
-        TileController.SwipeTiles(swipedTile, neighborTile);
-
-        // Swap tile controller references in dictionary
-        Tiles[swipedPos] = neighborTile;
-        Tiles[neighborPos] = swipedTile;
-
-        // Check for matches after a brief delay to let animation finish
-        StartCoroutine(CheckAndClearMatches());
-    }
-
-    private IEnumerator CheckAndClearMatches()
-    {
+        // Wait for swipe animation
         yield return new WaitForSeconds(swipeDuration);
 
+        // Check for matches
+        var matches = board.DetectMatch();
+
+        if (matches != null && matches.Count > 0)
+        {
+            // Process matches
+            yield return StartCoroutine(ProcessMatches(matches));
+        }
+        else
+        {
+            // Revert swap
+            SwapTiles(swipedPos, neighborPos);
+
+            // Wait for revert animation
+            yield return new WaitForSeconds(swipeDuration);
+        }
+
+        IsBusy = false;
+    }
+
+    private Vector2Int GetTilePosition(TileController tile)
+    {
+        var entry = Tiles.FirstOrDefault(kvp => kvp.Value == tile);
+        if (entry.Value != null)
+        {
+            return entry.Key;
+        }
+        return new Vector2Int(-1, -1);
+    }
+
+    private void SwapTiles(Vector2Int pos1, Vector2Int pos2)
+    {
+        TileController tile1 = Tiles[pos1];
+        TileController tile2 = Tiles[pos2];
+
+        board.Swipe(pos1, pos2);
+        TileController.SwipeTiles(tile1, tile2, swipeDuration);
+
+        Tiles[pos1] = tile2;
+        Tiles[pos2] = tile1;
+    }
+
+    private IEnumerator ProcessMatches(HashSet<Vector2Int> initialMatches)
+    {
+        HashSet<Vector2Int> matches = initialMatches;
         int iterations = 0;
 
-        while (true)
+        while (matches != null && matches.Count > 0)
         {
-            var matches = board.DetectMatch();
-
-            if (matches == null || matches.Count <= 0)
-                break;
-
             ClearMatches(matches);
 
             yield return StartCoroutine(CollapseAndAnimate());
-
             yield return StartCoroutine(RefillAndAnimate());
 
             iterations++;
@@ -155,6 +185,8 @@ public class BoardController : MonoBehaviour
                 Debug.LogWarning($"Reached max iterations ({maxIterations}) while resolving matches.");
                 break;
             }
+
+            matches = board.DetectMatch();
         }
     }
 

@@ -28,6 +28,9 @@ public class TileController : MonoBehaviour
 
     private void OnMouseDown()
     {
+        if (BoardController.Instance != null && BoardController.Instance.IsBusy)
+            return;
+
         _isPressed = true;
         _mouseDownPos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
     }
@@ -65,21 +68,20 @@ public class TileController : MonoBehaviour
         }
     }
 
-    public static void SwipeTiles(TileController tile1, TileController tile2)
+    public static void SwipeTiles(TileController tile1, TileController tile2, float duration)
     {
         if (tile1 == null || tile2 == null)
             return;
 
-        AnimateSwipe(tile1, tile2);
+        AnimateSwipe(tile1, tile2, duration);
     }
 
-    private static void AnimateSwipe(TileController tile1, TileController tile2)
+    private static void AnimateSwipe(TileController tile1, TileController tile2, float duration)
     {
         if (tile1 == null || tile2 == null) return;
 
         Vector3 tile1StartPos = tile1.transform.position;
         Vector3 tile2StartPos = tile2.transform.position;
-        float duration = 0.3f;
 
         // Animate tile1 to tile2's position
         tile1.transform.DOMove(tile2StartPos, duration)
