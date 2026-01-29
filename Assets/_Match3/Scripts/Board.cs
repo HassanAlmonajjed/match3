@@ -135,7 +135,6 @@ public class Board
             }
             grid += "\n";
         }
-        Debug.Log(grid);
     }
 
     public HashSet<Vector2Int> DetectMatch()

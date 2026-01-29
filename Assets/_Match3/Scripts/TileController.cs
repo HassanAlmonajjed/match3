@@ -13,16 +13,17 @@ public class TileController : MonoBehaviour
     private const float MinSwipeDistance = 0.3f;
     private Camera mainCamera;
 
+
     private void Awake()
     {
         mainCamera = Camera.main;
         _spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
-    public void SetTileColor(int id)
+    public void SetTileImage(int id)
     {
-        Color color = GetColorForTileId(id);
-        _spriteRenderer.color = color;
+        Sprite sprite = BoardController.Instance.GetSpriteForTileById(id);
+        _spriteRenderer.sprite = sprite;
     }
 
     private void OnMouseDown()
@@ -45,7 +46,6 @@ public class TileController : MonoBehaviour
 
         if (direction != SwipeDirection.None)
         {
-            Debug.Log($"Swipe {direction} on tile {name}");
             PlayerSwiped?.Invoke(this, direction);
         }
     }
@@ -75,27 +75,25 @@ public class TileController : MonoBehaviour
 
     private static void AnimateSwipe(TileController tile1, TileController tile2)
     {
+        if (tile1 == null || tile2 == null) return;
+
         Vector3 tile1StartPos = tile1.transform.position;
         Vector3 tile2StartPos = tile2.transform.position;
         float duration = 0.3f;
 
         // Animate tile1 to tile2's position
-        tile1.transform.DOMove(tile2StartPos, duration).SetEase(Ease.InOutQuad);
+        tile1.transform.DOMove(tile2StartPos, duration)
+            .SetEase(Ease.InOutQuad)
+            .SetLink(tile1.gameObject);
 
-        // Animate tile2 to tile1's position
-        tile2.transform.DOMove(tile1StartPos, duration).SetEase(Ease.InOutQuad);
-    }
-
-    private Color GetColorForTileId(int tileId)
-    {
-        return tileId switch
+        if (tile2 != null) // double check in case destruction happened exactly between lines
         {
-            1 => Color.blue,
-            2 => Color.green,
-            3 => Color.yellow,
-            _ => Color.white
-        };
+            tile2.transform.DOMove(tile1StartPos, duration)
+                .SetEase(Ease.InOutQuad)
+                .SetLink(tile2.gameObject);
+        }
     }
+
 
 }
 

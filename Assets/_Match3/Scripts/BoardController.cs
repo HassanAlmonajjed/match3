@@ -6,12 +6,17 @@ using DG.Tweening;
 
 public class BoardController : MonoBehaviour
 {
+    public static BoardController Instance { get; private set; }
+
     [SerializeField] private TileController tilePrefab;
     [SerializeField] private int width = 5;
     [SerializeField] private int height = 5;
     [SerializeField] private float _gap = 0.1f;
     [SerializeField] private int maxIterations = 20;
     [SerializeField] private Vector3 _offset;
+
+    [Header("Sprites")]
+    [SerializeField] private Sprite[] tileSprites;
 
     [Header("Animations")]
     [SerializeField] private float swipeDuration = 0.2f; // Duration of swipe animation
@@ -24,6 +29,18 @@ public class BoardController : MonoBehaviour
 
     public Dictionary<Vector2Int, TileController> Tiles { get; private set; } = new();
 
+
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
 
     void Start()
     {
@@ -57,7 +74,7 @@ public class BoardController : MonoBehaviour
 
                 Tiles.Add(tilePosition, tileObj);
 
-                tileObj.SetTileColor(tile.id);
+                tileObj.SetTileImage(tile.id);
             }
         }
     }
@@ -213,6 +230,8 @@ public class BoardController : MonoBehaviour
             Vector2Int gridPos = kvp.Key;
             TileController controller = kvp.Value;
 
+            if (controller == null) continue;
+
             Vector3 targetPos = CalculateTilePosition(gridPos.x, gridPos.y, _tileSize, _gap, _offset);
 
             // Optional safety: skip if already in place
@@ -223,6 +242,7 @@ public class BoardController : MonoBehaviour
                 controller.transform
                     .DOMove(targetPos, collapseDuration)
                     .SetEase(Ease.InOutQuad)
+                    .SetLink(controller.gameObject)
             );
         }
 
@@ -263,7 +283,7 @@ public class BoardController : MonoBehaviour
                 spawnPos.y = refillPoint;
 
                 TileController tileObj = Instantiate(tilePrefab, spawnPos, Quaternion.identity);
-                tileObj.SetTileColor(tile.id);
+                tileObj.SetTileImage(tile.id);
 
                 addedTiles[pos] = tileObj;
                 Tiles[pos] = tileObj;
@@ -285,8 +305,11 @@ public class BoardController : MonoBehaviour
                 var pos = new Vector2Int(i, j);
                 if (addedTiles.TryGetValue(pos, out var tileObj))
                 {
+                    if (tileObj == null) continue;
                     Vector3 finalPos = CalculateTilePosition(i, j, _tileSize, _gap, _offset);
-                    fillSeq.Insert(fillDelayCounter, tileObj.transform.DOMove(finalPos, collapseDuration).SetEase(Ease.OutBounce));
+                    fillSeq.Insert(fillDelayCounter, tileObj.transform.DOMove(finalPos, collapseDuration)
+                        .SetEase(Ease.OutBounce)
+                        .SetLink(tileObj.gameObject));
                     fillDelayCounter += collapseStaggerDelay;
                 }
             }
@@ -301,19 +324,37 @@ public class BoardController : MonoBehaviour
 
         foreach (var match in matches)
         {
-            if (Tiles.ContainsKey(match))
+            if (Tiles.TryGetValue(match, out var controller))
             {
-                var tileObj = Tiles[match].gameObject;
-                if (Application.isPlaying)
+                if (controller != null)
                 {
-                    Destroy(tileObj);
-                }
-                else
-                {
-                    DestroyImmediate(tileObj);
+                    var tileObj = controller.gameObject;
+                    
+                    // Kill any active tweens on the object before destroying it
+                    tileObj.transform.DOKill();
+
+                    if (Application.isPlaying)
+                    {
+                        Destroy(tileObj);
+                    }
+                    else
+                    {
+                        DestroyImmediate(tileObj);
+                    }
                 }
                 Tiles.Remove(match);
             }
         }
+    }
+
+    public Sprite GetSpriteForTileById(int id)
+    {
+        int index = id - 1;
+        if (tileSprites == null || index < 0 || index >= tileSprites.Length)
+        {
+            Debug.LogWarning($"Sprite for tile ID {id} not found.");
+            return null;
+        }
+        return tileSprites[index];
     }
 }
