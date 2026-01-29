@@ -1,6 +1,5 @@
 using UnityEngine;
 using System;
-using System.Collections;
 using DG.Tweening;
 
 [RequireComponent(typeof(SpriteRenderer))]

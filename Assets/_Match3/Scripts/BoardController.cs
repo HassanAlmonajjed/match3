@@ -9,24 +9,28 @@ public class BoardController : MonoBehaviour
     [SerializeField] private TileController tilePrefab;
     [SerializeField] private int width = 5;
     [SerializeField] private int height = 5;
+    [SerializeField] private float _gap = 0.1f;
+    [SerializeField] private int maxIterations = 20;
+    [SerializeField] private Vector3 _offset;
 
     [Header("Animations")]
     [SerializeField] private float swipeDuration = 0.2f; // Duration of swipe animation
     [SerializeField] private float collapseDuration = 0.3f; // Duration of collapse animation
     [SerializeField] private float collapseStaggerDelay = 0.02f; // Delay between tiles falling
 
-    private Board board;
-    private readonly Dictionary<Vector2Int, TileController> tiles = new();
+    private const float _tileSize = 1;
+    private const float refillPoint = 3;
+    public Board board;
 
-    private const float gap = 0.1f; 
-    private const int maxIterations = 20;
+    public Dictionary<Vector2Int, TileController> Tiles { get; private set; } = new();
+
 
     void Start()
     {
         board = new Board(width, height);
         board.Populate();
         GenerateBoard();
-        
+
         TileController.PlayerSwiped += OnPlayerSwiped;
     }
 
@@ -37,26 +41,33 @@ public class BoardController : MonoBehaviour
 
     public void GenerateBoard()
     {
-        for (int x = 0; x < board.Width; x++)
+        for (int i = 0; i < board.Width; i++)
         {
-            for (int y = 0; y < board.Height; y++)
+            for (int j = 0; j < board.Height; j++)
             {
-                Tile tile = board.GetTileAtPosition(new Vector2Int(x, y));
-                if (tile != null)       
-                {
-                    // Calculate position with gaps relative to board starting point
-                    // y=0 is at top, y increases downward
-                    Vector3 position = transform.position + new Vector3(x * (1f + gap), -y * (1f + gap), 0);
+                Vector2Int tilePosition = new(i, j);
 
-                    // Instantiate tile prefab as child of BoardController
-                    TileController tileObj = Instantiate(tilePrefab, position, Quaternion.identity, transform);
+                Tile tile = board.GetTileAtPosition(tilePosition);
+                if (tile == null)
+                    continue;
 
-                    tiles[new Vector2Int(x, y)] = tileObj;
+                Vector3 position = CalculateTilePosition(i, j, _tileSize, _gap, _offset);
 
-                    tileObj.SetTileColor(tile.id);
-                }
+                TileController tileObj = Instantiate(tilePrefab, position, Quaternion.identity);
+
+                Tiles.Add(tilePosition, tileObj);
+
+                tileObj.SetTileColor(tile.id);
             }
         }
+    }
+
+    public Vector3 CalculateTilePosition(int i, int j, float tileSize, float gap, Vector3 offset)
+    {
+        float x = i * (tileSize + gap);
+        float y = -j * (tileSize + gap);
+        Vector3 position = offset + new Vector3(x, y);
+        return position;
     }
 
     private void OnPlayerSwiped(TileController swipedTile, SwipeDirection direction)
@@ -64,7 +75,7 @@ public class BoardController : MonoBehaviour
         Vector2Int swipedPos = Vector2Int.zero;
         bool found = false;
 
-        var swipedEntry = tiles.FirstOrDefault(kvp => kvp.Value == swipedTile);
+        var swipedEntry = Tiles.FirstOrDefault(kvp => kvp.Value == swipedTile);
         if (swipedEntry.Value != null)
         {
             swipedPos = swipedEntry.Key;
@@ -82,10 +93,10 @@ public class BoardController : MonoBehaviour
             return;
 
         // Check if both tiles exist
-        if (!tiles.ContainsKey(neighborPos))
+        if (!Tiles.ContainsKey(neighborPos))
             return;
 
-        TileController neighborTile = tiles[neighborPos];
+        TileController neighborTile = Tiles[neighborPos];
 
         // Swap in the board logic
         board.Swipe(swipedPos, neighborPos);
@@ -94,8 +105,8 @@ public class BoardController : MonoBehaviour
         TileController.SwipeTiles(swipedTile, neighborTile);
 
         // Swap tile controller references in dictionary
-        tiles[swipedPos] = neighborTile;
-        tiles[neighborPos] = swipedTile;
+        Tiles[swipedPos] = neighborTile;
+        Tiles[neighborPos] = swipedTile;
 
         // Check for matches after a brief delay to let animation finish
         StartCoroutine(CheckAndClearMatches());
@@ -103,7 +114,6 @@ public class BoardController : MonoBehaviour
 
     private IEnumerator CheckAndClearMatches()
     {
-        // Wait for swipe animation to finish before checking for matches
         yield return new WaitForSeconds(swipeDuration);
 
         int iterations = 0;
@@ -136,120 +146,173 @@ public class BoardController : MonoBehaviour
     {
         board.CollapseColumns();
 
-        var newTiles = new Dictionary<Vector2Int, TileController>();
-        Sequence seq = DOTween.Sequence();
-        Collapse(newTiles, seq);
+        var newTiles = Collapse();
+        Sequence seq = AnimateCollapse(newTiles);
 
         if (seq.Duration(false) > 0)
             yield return seq.WaitForCompletion();
 
-        tiles.Clear();
+        Tiles.Clear();
         foreach (var tile in newTiles)
-            tiles[tile.Key] = tile.Value;
+            Tiles[tile.Key] = tile.Value;
     }
 
-
-
-    private void Collapse(Dictionary<Vector2Int, TileController> newTileControllers, Sequence seq)
+    public Dictionary<Vector2Int, TileController> Collapse()
     {
-        for (int x = 0; x < board.Width; x++)
+        Dictionary<Vector2Int, TileController> newTileControllers = new();
+
+        for (int i = 0; i < board.Width; i++)
         {
-            // Collect all existing tile controllers in this column, sorted by their CURRENT Y position (top to bottom)
-            var existingControllers = tiles
-                .Where(kvp => kvp.Key.x == x)
+            var existingControllers = Tiles
+                .Where(kvp => kvp.Key.x == i)
                 .OrderBy(kvp => kvp.Key.y)
                 .Select(kvp => kvp.Value)
                 .ToList();
-            
-            // Now find where the board model says tiles should be in this column (also top to bottom)
+
             int controllerIndex = 0;
-            for (int y = 0; y < board.Height; y++)
+
+            for (int j = 0; j < board.Height; j++)
             {
-                var pos = new Vector2Int(x, y);
+                var pos = new Vector2Int(i, j);
                 var tile = board.GetTileAtPosition(pos);
-                
-                if (tile != null)
+
+                if (tile == null)
+                    continue;
+
+                if (controllerIndex < existingControllers.Count)
                 {
-                    if (controllerIndex < existingControllers.Count)
-                    {
-                        var controller = existingControllers[controllerIndex];
-                        // Visual position: y=0 is at top, so use -y
-                        Vector3 newPos = transform.position + new Vector3(x * (1f + gap), -y * (1f + gap), 0);
-
-                        float delay = controllerIndex * collapseStaggerDelay;
-                        seq.Insert(delay, controller.transform.DOMove(newPos, collapseDuration).SetEase(Ease.InOutQuad));
-
-                        newTileControllers[pos] = controller;
-                        controllerIndex++;
-                    }
-                    else
-                    {
-                        Debug.LogError($"Collapse Mismatch: Board has more tiles than Controller at Column {x}. Board needs tile at {y}, but we only had {existingControllers.Count} controllers.");
-                    }
+                    var controller = existingControllers[controllerIndex];
+                    newTileControllers[pos] = controller;
+                    controllerIndex++;
+                }
+                else
+                {
+                    Debug.LogError(
+                        $"Collapse Mismatch: Board has more tiles than Controller at Column {i}. Board needs tile at {j}, but we only had {existingControllers.Count} controllers."
+                    );
                 }
             }
 
-            // Safety check: Did we use all controllers?
             if (controllerIndex < existingControllers.Count)
             {
-                Debug.LogWarning($"Collapse Mismatch: Controller has MORE tiles than Board at Column {x}. Used {controllerIndex} of {existingControllers.Count} controllers.");
+                Debug.LogWarning(
+                    $"Collapse Mismatch: Controller has MORE tiles than Board at Column {i}. Used {controllerIndex} of {existingControllers.Count} controllers."
+                );
             }
         }
+
+        return newTileControllers;
     }
+
+    private Sequence AnimateCollapse(Dictionary<Vector2Int, TileController> tiles)
+    {
+        Sequence seq = DOTween.Sequence();
+
+        foreach (var kvp in tiles)
+        {
+            Vector2Int gridPos = kvp.Key;
+            TileController controller = kvp.Value;
+
+            Vector3 targetPos = CalculateTilePosition(gridPos.x, gridPos.y, _tileSize, _gap, _offset);
+
+            // Optional safety: skip if already in place
+            if (controller.transform.position == targetPos)
+                continue;
+
+            seq.Join(
+                controller.transform
+                    .DOMove(targetPos, collapseDuration)
+                    .SetEase(Ease.InOutQuad)
+            );
+        }
+
+        return seq;
+    }
+
 
     private IEnumerator RefillAndAnimate()
     {
-        // Refill model
         board.Refill();
 
-        Sequence fillSeq = DOTween.Sequence();
-        float fillDelayCounter = 0f;
+        var addedTiles = Refill();
 
-        for (int x = 0; x < board.Width; x++)
+        Sequence fillSeq = AnimateRefill(addedTiles);
+
+        if (fillSeq.Duration(false) > 0)
+            yield return fillSeq.WaitForCompletion();
+    }
+
+    public Dictionary<Vector2Int, TileController> Refill()
+    {
+        Dictionary<Vector2Int, TileController> addedTiles = new();
+
+        for (int i = 0; i < board.Width; i++)
         {
-            for (int y = 0; y < board.Height; y++)
+            for (int j = 0; j < board.Height; j++)
             {
-                var pos = new Vector2Int(x, y);
-                if (tiles.ContainsKey(pos))
+                var pos = new Vector2Int(i, j);
+                if (Tiles.ContainsKey(pos))
                     continue;
 
                 Tile tile = board.GetTileAtPosition(pos);
                 if (tile == null)
                     continue;
 
-                // Spawn above the board (negative y value, above y=0)
-                Vector3 spawnPos = transform.position + new Vector3(x * (1f + gap), (1f + gap), 0);
-                // y=0 is at top, so use -y for visual position
-                Vector3 finalPos = transform.position + new Vector3(x * (1f + gap), -y * (1f + gap), 0);
+                Vector3 finalPos = CalculateTilePosition(i, j, _tileSize, _gap, _offset);
+                Vector3 spawnPos = finalPos;
+                spawnPos.y = refillPoint;
 
-                TileController tileObj = Instantiate(tilePrefab, spawnPos, Quaternion.identity, transform);
+                TileController tileObj = Instantiate(tilePrefab, spawnPos, Quaternion.identity);
                 tileObj.SetTileColor(tile.id);
 
-                // Register immediately so lookups work
-                tiles[pos] = tileObj;
-
-                // Animate into place with staggered delay
-                fillSeq.Insert(fillDelayCounter, tileObj.transform.DOMove(finalPos, collapseDuration).SetEase(Ease.OutBounce));
-                fillDelayCounter += collapseStaggerDelay;
+                addedTiles[pos] = tileObj;
+                Tiles[pos] = tileObj;
             }
         }
 
-        if (fillSeq.Duration(false) > 0)
-            yield return fillSeq.WaitForCompletion();
+        return addedTiles;
     }
 
-    private void ClearMatches(HashSet<Vector2Int> matches)
+    private Sequence AnimateRefill(Dictionary<Vector2Int, TileController> addedTiles)
     {
-        // Clear matches in the board model
+        Sequence fillSeq = DOTween.Sequence();
+        float fillDelayCounter = 0f;
+
+        for (int i = 0; i < board.Width; i++)
+        {
+            for (int j = 0; j < board.Height; j++)
+            {
+                var pos = new Vector2Int(i, j);
+                if (addedTiles.TryGetValue(pos, out var tileObj))
+                {
+                    Vector3 finalPos = CalculateTilePosition(i, j, _tileSize, _gap, _offset);
+                    fillSeq.Insert(fillDelayCounter, tileObj.transform.DOMove(finalPos, collapseDuration).SetEase(Ease.OutBounce));
+                    fillDelayCounter += collapseStaggerDelay;
+                }
+            }
+        }
+
+        return fillSeq;
+    }
+
+    public void ClearMatches(HashSet<Vector2Int> matches)
+    {
         board.ClearMatches(matches);
 
-        // Destroy tile GameObjects for cleared positions
-        foreach (var pos in matches)
+        foreach (var match in matches)
         {
-            if (tiles.ContainsKey(pos))
+            if (Tiles.ContainsKey(match))
             {
-                Destroy(tiles[pos].gameObject);
-                tiles.Remove(pos);
+                var tileObj = Tiles[match].gameObject;
+                if (Application.isPlaying)
+                {
+                    Destroy(tileObj);
+                }
+                else
+                {
+                    DestroyImmediate(tileObj);
+                }
+                Tiles.Remove(match);
             }
         }
     }
