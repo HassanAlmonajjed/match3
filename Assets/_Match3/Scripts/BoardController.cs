@@ -51,6 +51,7 @@ public class BoardController : MonoBehaviour
         GenerateBoard();
 
         TileController.PlayerSwiped += OnPlayerSwiped;
+        GameManager.Instance.SetState(GameState.Playing);
     }
 
     private void OnDestroy()
@@ -92,6 +93,9 @@ public class BoardController : MonoBehaviour
     private void OnPlayerSwiped(TileController swipedTile, SwipeDirection direction)
     {
         if (IsBusy)
+            return;
+
+        if (GameManager.Instance.GameState != GameState.Playing)
             return;
 
         StartCoroutine(SwipeCoroutine(swipedTile, direction));
@@ -137,6 +141,8 @@ public class BoardController : MonoBehaviour
         {
             // Revert swap
             SwapTiles(swipedPos, neighborPos);
+
+            GameManager.Instance.DetectGameOver(); 
 
             // Wait for revert animation
             yield return new WaitForSeconds(swipeDuration);
@@ -188,6 +194,8 @@ public class BoardController : MonoBehaviour
 
             matches = board.DetectMatch();
         }
+
+        GameManager.Instance.DetectGameOver();
     }
 
     private IEnumerator CollapseAndAnimate()
