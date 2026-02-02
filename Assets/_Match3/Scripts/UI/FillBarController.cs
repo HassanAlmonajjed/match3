@@ -11,12 +11,48 @@ public class FillBarController : MonoBehaviour
 
     private void Start()
     {
-        UpdateProgress(0f);
+        if (ScoreManager.Instance != null)
+        {
+            ScoreManager.Instance.ScoreChanged += HandleScoreChanged;
+            UpdateProgressByScore(ScoreManager.Instance.Score);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (ScoreManager.Instance != null)
+        {
+            ScoreManager.Instance.ScoreChanged -= HandleScoreChanged;
+        }
+    }
+
+    private void HandleScoreChanged(int score)
+    {
+        UpdateProgressByScore(score);
+    }
+
+    private void UpdateProgressByScore(int score)
+    {
+        if (ScoreManager.Instance == null) return;
+
+        int maxScore = ScoreManager.Instance.MaxRequiredScore;
+        float progress = maxScore > 0 ? (float)score / maxScore : 0f;
+        
+        slider.value = progress;
+        int filledCount = ScoreManager.Instance.CalculateStars(score);
+
+        for (int i = 0; i < stars.Count; i++)
+        {
+            stars[i].sprite = i < filledCount ? filledSprite : unfilledSprite;
+        }
     }
 
     public void UpdateProgress(float progress)
     {
         slider.value = progress;
+        // This method might be called from elsewhere, but we prefer UpdateProgressByScore
+        // To maintain compatibility, we use the local calculation here if needed, 
+        // but the main flow now uses the score-based one.
         int filledCount = CalculateFilledStars(progress);
 
         for (int i = 0; i < stars.Count; i++)

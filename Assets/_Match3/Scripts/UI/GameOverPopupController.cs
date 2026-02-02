@@ -21,8 +21,11 @@ public class GameOverPopupController : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    public void SetupMenu(int starsCount, bool hasWin, int score = 0)
+    public void SetupMenu(int score)
     {
+        int starsCount = ScoreManager.Instance.CalculateStars(score);
+        bool hasWin = starsCount >= 1;
+
         titleText.text = hasWin ? "Complete" : "Game Over";
         scoreText.text = score.ToString();
 

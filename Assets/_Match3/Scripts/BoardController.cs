@@ -180,6 +180,7 @@ public class BoardController : MonoBehaviour
 
         while (matches != null && matches.Count > 0)
         {
+            ScoreManager.Instance.UpdateScore(matches.Count);
             ClearMatches(matches);
 
             yield return StartCoroutine(CollapseAndAnimate());
